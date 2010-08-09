@@ -1,7 +1,7 @@
 id: SphinxSearch
 name: SphinxSearch
 description: Alternative search engine in MT using SphinxSearch
-version: 0.201
+version: 0.3
 
 author_name: Six Apart, Ltd.
 author_link: http://www.sixapart.com/
