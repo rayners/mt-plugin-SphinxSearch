@@ -89,7 +89,7 @@ sub init_sphinxable {
     require MT::Entry;
     require MT::Comment;
     MT::Entry->sphinx_init(
-        select_values => { status => MT::Entry::RELEASE() },
+        select_values => { class => '*', status => MT::Entry::RELEASE() },
         group_columns => ['author_id'],
         include_meta  => 1,
         mva           => {

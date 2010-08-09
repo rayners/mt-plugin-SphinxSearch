@@ -41,6 +41,7 @@ sub _check_searchd {
     open my $pid_file, "<", $pid_path or return undef;
     local $/ = undef;
     my $pid = <$pid_file>;
+    chomp $pid;
     close $pid_file;
 
     # returns number of process that exist and can be signaled

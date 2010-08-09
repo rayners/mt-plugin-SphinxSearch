@@ -460,7 +460,7 @@ sub _gen_sphinx_conf_tmpl {
 
     require MT::Entry;
     my @num_entries = ();
-    my $iter = MT::Entry->count_group_by( { status => MT::Entry::RELEASE() },
+    my $iter = MT->model('entry')->count_group_by( { class => '*', status => MT::Entry::RELEASE() },
         { group => ['blog_id'] } );
     my $entry_count;
     push @num_entries, $entry_count while ( ($entry_count) = $iter->() );

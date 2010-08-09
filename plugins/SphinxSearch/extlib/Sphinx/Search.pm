@@ -576,7 +576,8 @@ sub _Connect {
     }
     binmode( $fp, ':bytes' );
     if ( $self->{_read_timeout} ) {
-        my $to = pack( 'qq', $self->{_read_timeout}, 0 );
+	# tim@appnel.com 6/9/10: changed pack type to ll from qq to work around lack of 32bit support
+        my $to = pack( 'll', $self->{_read_timeout}, 0 );
         $fp->sockopt( SO_RCVTIMEO, $to );
     }
 
