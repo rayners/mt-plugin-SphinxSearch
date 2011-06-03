@@ -33,11 +33,12 @@ sub _get_sphinx {
         $spx->ResetGroupBy();
 
         my $time_since_opened = time - $spx->{_connected_at};
-        if ( $time_since_opened > MT->config->SphinxSearchdMaxConnectionAge ) {
+        if ( $time_since_opened > MT->config->SphinxSearchdMaxConnectionAge )
+        {
             $spx->Close();
             $spx->Open()
-              or die "Error opening persistent connection to searchd: "
-              . $spx->GetLastError();
+                or die "Error opening persistent connection to searchd: "
+                . $spx->GetLastError();
         }
 
         return $spx;
@@ -46,20 +47,20 @@ sub _get_sphinx {
     $spx = Sphinx::Search->new;
     require MT;
 
-    my ( $host, $port ) =
-      ( MT->config->SphinxSearchdHost, MT->config->SphinxSearchdPort );
+    my ( $host, $port )
+        = ( MT->config->SphinxSearchdHost, MT->config->SphinxSearchdPort );
 
     if ( !( $host && $port ) ) {
         my $plugin = MT->component('sphinxsearch');
         $host = $plugin->get_config_value( 'searchd_host', 'system' )
-          if ( !$host );
+            if ( !$host );
         $port = $plugin->get_config_value( 'searchd_port', 'system' )
-          if ( !$port );
+            if ( !$port );
     }
     $spx->SetServer( $host, $port );
     $spx->SetConnectTimeout( MT->config->SphinxSearchdConnectTimeout )
-      if ( MT->config->SphinxSearchdConnectTimeout );
-    $spx->SetEncoders( sub { shift }, sub { shift } );
+        if ( MT->config->SphinxSearchdConnectTimeout );
+    $spx->SetEncoders( sub {shift}, sub {shift} );
     $spx->SetRetries( MT->config->SphinxSearchdAgentRetries );
     $spx->SetReadTimeout(
         MT->config->SphinxSearchdReadTimeout,
@@ -67,8 +68,8 @@ sub _get_sphinx {
     );
 
     $spx->Open()
-      or die "Error opening persistent connection to searchd: "
-      . $spx->GetLastError();
+        or die "Error opening persistent connection to searchd: "
+        . $spx->GetLastError();
     MT->instance->{__sphinx_obj} = $spx;
 
     return $spx;
@@ -109,9 +110,9 @@ sub init_sphinxable {
         mva           => {
             response_to => {
                 query =>
-'select distinct mt_comment.comment_id, response_to.comment_commenter_id from mt_comment, mt_comment as response_to where mt_comment.comment_entry_id = response_to.comment_entry_id and mt_comment.comment_created_on > response_to.comment_created_on and response_to.comment_commenter_id is not null',
+                    'select distinct mt_comment.comment_id, response_to.comment_commenter_id from mt_comment, mt_comment as response_to where mt_comment.comment_entry_id = response_to.comment_entry_id and mt_comment.comment_created_on > response_to.comment_created_on and response_to.comment_commenter_id is not null',
                 to     => 'MT::Author',
-	            by => [ 'comment_id', 'author_id' ],
+                by     => [ 'comment_id', 'author_id' ],
                 lookup => 'name',
                 stash  => [ 'author', 'authors' ],
             },
@@ -128,37 +129,39 @@ sub init_sphinxable {
     require MT::Tag;
     require MT::ObjectTag;
 
-	MT::Tag->sphinx_init(
-	    index         => 'tag',
-	    stash         => 'sphinxtags',
-	    select_values => { is_private => 0 },
-		include_columns => [ 'name' ],
-		count_columns => {
-			entry_count => {
-				what => 'MT::ObjectTag',
-				with => 'tag_id',
-				select_values => { object_datasource => 'entry' }
-			}
-		},
-	    mva => {
-			entry => {
-	            to            => 'MT::Entry',
-	            with          => 'MT::ObjectTag',
-	            by            => [ 'tag_id', 'object_id' ],
-	            select_values => { object_datasource => 'entry' },
-			},
-			category => {
-	            to => 'MT::Category',
+    MT::Tag->sphinx_init(
+        index           => 'tag',
+        stash           => 'sphinxtags',
+        select_values   => { is_private => 0 },
+        include_columns => ['name'],
+        count_columns   => {
+            entry_count => {
+                what          => 'MT::ObjectTag',
+                with          => 'tag_id',
+                select_values => { object_datasource => 'entry' }
+            }
+        },
+        mva => {
+            entry => {
+                to            => 'MT::Entry',
+                with          => 'MT::ObjectTag',
+                by            => [ 'tag_id', 'object_id' ],
+                select_values => { object_datasource => 'entry' },
+            },
+            category => {
+                to     => 'MT::Category',
                 lookup => 'id',
                 stash  => [ 'category', 'categories' ],
 
-	            by => [ 'tag_id', 'category_id' ],
-				# remember to allow for the appendage of the columns defined above: by[0] = object_id i.e. tag_id = object_id.
-				# See Config.pm fore more details
-				query => 'select distinct tag_id, placement_category_id from mt_tag, mt_objecttag, mt_placement where tag_id = objecttag_tag_id and objecttag_object_id = placement_entry_id'
-			},
-		}
-	);
+                by => [ 'tag_id', 'category_id' ],
+
+# remember to allow for the appendage of the columns defined above: by[0] = object_id i.e. tag_id = object_id.
+# See Config.pm fore more details
+                query =>
+                    'select distinct tag_id, placement_category_id from mt_tag, mt_objecttag, mt_placement where tag_id = objecttag_tag_id and objecttag_object_id = placement_entry_id'
+            },
+        }
+    );
 }
 
 sub init_apps {
@@ -193,11 +196,11 @@ sub pre_load_template {
 sub _pid_path {
     my $plugin = MT->component('sphinxsearch');
     my $pid_file = $plugin->get_config_value( 'searchd_pid_path', 'system' );
-    my $sphinx_file_path =
-      $plugin->get_config_value( 'sphinx_file_path', 'system' );
+    my $sphinx_file_path
+        = $plugin->get_config_value( 'sphinx_file_path', 'system' );
 
     return File::Spec->catfile( $sphinx_file_path, 'searchd.pid' )
-      if ($sphinx_file_path);
+        if ($sphinx_file_path);
     return $sphinx_file_path;
 }
 
