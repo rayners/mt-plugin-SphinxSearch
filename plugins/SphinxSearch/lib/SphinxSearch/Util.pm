@@ -162,6 +162,13 @@ sub init_sphinxable {
             },
         }
     );
+
+    MT::Asset->sphinx_init(
+        index         => 'asset',
+        stash         => 'assets',
+        group_columns => ['blog_id'],
+        include_meta  => 1
+    );
 }
 
 sub init_apps {
