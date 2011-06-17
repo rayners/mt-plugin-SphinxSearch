@@ -43,14 +43,15 @@ sub options {
 sub main {
     my $self = shift;
     ($verbose) = $self->SUPER::main(@_);
-    my $plugin = MT::Plugin::SphinxSearch->instance;
+    my $plugin
+        = MT->component('SphinxSearch');  #MT::Plugin::SphinxSearch->instance;
 
     $plugin->set_config_value( 'sphinx_path', $bin_path, 'system' )
-      if ($bin_path);
+        if ($bin_path);
     $plugin->set_config_value( 'sphinx_file_path', $file_path, 'system' )
-      if ($file_path);
+        if ($file_path);
     $plugin->set_config_value( 'sphinx_conf_path', $conf_path, 'system' )
-      if ($conf_path);
+        if ($conf_path);
     $plugin->set_config_value( 'db_host', $db_host, 'system' ) if ($db_host);
     $plugin->set_config_value( 'db_user', $db_user, 'system' ) if ($db_user);
     $plugin->set_config_value( 'db_pass', $db_pass, 'system' ) if ($db_pass);
