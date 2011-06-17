@@ -278,55 +278,127 @@ sub _get_source_config {
                 my $what_class  = $counts->{$count}->{what};
                 my $with_column = $counts->{$count}->{with};
                 my $wheres      = $counts->{$count}->{select_values};
-                eval("require $what_class;");
+                eval("require $what_class;");    ## no critic
                 next if ($@);
 
                 my $what_ds = $what_class->datasource;
-                my $count_query =
-"SELECT count(*) from mt_$what_ds WHERE ${what_ds}_$with_column = ${source}_"
-                  . $index_hash->{id_column};
+                my $count_query
+                    = "SELECT count(*) from mt_$what_ds WHERE ${what_ds}_$with_column = ${source}_"
+                    . $index_hash->{id_column};
                 if ($wheres) {
                     $count_query .= ' AND '
-                      . join( ' AND ',
+                        . join( ' AND ',
                         map { "${what_ds}_$_ = \"" . $wheres->{$_} . "\"" }
-                          keys %$wheres );
+                            keys %$wheres );
                 }
                 $counts{$index}->{$count} = $count_query;
+            }
+        }
+
+        # build the text filters list
+        # - start with the group columns
+        my @tfs = ();
+        foreach my $gc ( keys %{ $index_hash->{group_columns} } ) {
+            push @tfs, "concat('${source}_${gc}_', ${source}_${gc})";
+        }
+
+        # - now mvas
+        foreach my $mva ( keys %{ $index_hash->{mva} } ) {
+            my $cur_mva = $index_hash->{mva}->{$mva};
+            next
+                unless ref($cur_mva)
+                    && !$cur_mva
+                    ->{query};    # skip if it's just a straight query
+            my $with = $cur_mva->{with}->datasource;
+            my $tf_query
+                = "( select group_concat(concat('${source}_${mva}_', ${with}_"
+                . $cur_mva->{by}->[-1]
+                . ")) from mt_${with}";
+            $tf_query
+                .= " where ${with}_"
+                . $cur_mva->{by}->[0]
+                . " = ${source}_id";
+            if ( my $sel_values = $cur_mva->{select_values} ) {
+                $tf_query .= " AND "
+                    . join( " AND ",
+                    map { "${with}_$_ = \"" . $sel_values->{$_} . "\"" }
+                        keys %$sel_values );
+            }
+            $tf_query .= " group by ${with}_" . $cur_mva->{by}->[0] . " )";
+            push @tfs, $tf_query;
+        }
+
+        # now we build a list of custom fields
+        # make sure to skip if we don't have them
+        my $cf_query;
+        if ( MT->model('field') ) {
+
+            # load all the fields for the given datasource
+            # I don't know if it'd be practical to try and do
+            # it on a blog-by-blog basis
+            if ( my @fields
+                = MT->model('field')->load( { obj_type => $source } ) )
+            {
+                my @cfs;
+                my $types = MT->registry('customfield_types');
+                foreach my $field (@fields) {
+                    my $cf_type  = $types->{ $field->type };
+                    my $meta_col = $cf_type->{column_def} || 'vblob';
+                    my $bn       = $field->basename;
+                    my $cf_q
+                        = "( select concat('entry_field_${bn}_', ${source}_meta_${meta_col}) from mt_${source}_meta";
+                    $cf_q
+                        .= " where ${source}_meta_${source}_id = ${source}_id and ${source}_meta_type = 'field.${bn}') as ${source}_cf_${bn}";
+
+                    push @cfs, $cf_q;
+                }
+
+                $cf_query = ", " . join( ', ', @cfs ) if (@cfs);
             }
         }
 
         # build main query
         $query{$index} = "SELECT " . join(
             ", ",
-            map {
-                $index_hash->{date_columns}->{$_}
-                  ? 'UNIX_TIMESTAMP(' . $source . '_' . $_ . ') as ' . $_
-                  : $index_hash->{group_columns}->{$_}
-                  ? "${source}_$_ as " . $index_hash->{group_columns}->{$_}
-                  : $index_hash->{string_group_columns}->{$_}
-                  ? ( $source . '_' . $_, "CRC32(${source}_$_) as ${_}_crc32" )
-                  : $counts{$index}->{$_}
-                  ? "(" . $counts{$index}->{$_} . ") as $_"
-                  : $source . '_'
-                  . $_
-              } (
-                $index_hash->{id_column},
-                @{ $index_hash->{columns} },
-                keys %{ $counts{$index} }
-              )
+            (   map {
+                    $index_hash->{date_columns}->{$_}
+                        ? 'UNIX_TIMESTAMP(' 
+                        . $source . '_' 
+                        . $_ . ') as '
+                        . $_
+                        : $index_hash->{group_columns}->{$_}
+                        ? "${source}_$_ as "
+                        . $index_hash->{group_columns}->{$_}
+                        : $index_hash->{string_group_columns}->{$_} ? (
+                        $source . '_' . $_,
+                        "CRC32(${source}_$_) as ${_}_crc32"
+                        )
+                        : $counts{$index}->{$_}
+                        ? "(" . $counts{$index}->{$_} . ") as $_"
+                        : $source . '_'
+                        . $_
+                    } (
+                    $index_hash->{id_column},
+                    @{ $index_hash->{columns} },
+                    keys %{ $counts{$index} }
+                    )
+            ),
+            "concat_ws(' ', "
+                . join( ", ", @tfs )
+                . ") as text_filters$cf_query"
         ) . " FROM mt_$source";
         if ( my $sel_values = $index_hash->{select_values} ) {
             $query{$index} .= " WHERE "
-              . join( " AND ",
+                . join( " AND ",
                 map { "${source}_$_ = \"" . $sel_values->{$_} . "\"" }
-                  keys %$sel_values );
+                    keys %$sel_values );
         }
 
         # build info query
-        $info_query{$index} =
-            "SELECT * from mt_$source where ${source}_"
-          . $index_hash->{id_column}
-          . ' = $id';
+        $info_query{$index}
+            = "SELECT * from mt_$source where ${source}_"
+            . $index_hash->{id_column}
+            . ' = $id';
 
         # build multi-value attributes
         if ( $index_hash->{mva} ) {
