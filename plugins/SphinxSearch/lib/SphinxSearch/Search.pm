@@ -445,6 +445,13 @@ sub category {
 
         require MT::Request;
         $stash->{sphinx_search_categories} = \@all_cats;
+
+        # if we were only passed a single category name
+        # and if we got a single category in return
+        # stuff it into the stash for the templates
+        if ( $cat_basename !~ /,/ && scalar @all_cats == 1 ) {
+            $stash->{category} = @all_cats[0];
+        }
     }
 
     1;
